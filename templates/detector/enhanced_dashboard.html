@@ -1,0 +1,509 @@
+{% extends 'detector/base.html' %}
+{% load static %}
+
+{% block title %}ML Security Dashboard{% endblock %}
+
+{% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.min.css" rel="stylesheet">
+<style>
+    .dashboard-card {
+        @apply bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 border border-gray-200 dark:border-gray-700;
+    }
+    
+    .metric-card {
+        @apply bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg p-6 shadow-lg;
+    }
+    
+    .threat-card {
+        @apply bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 p-4 rounded-r-lg;
+    }
+    
+    .safe-card {
+        @apply bg-green-50 dark:bg-green-900/20 border-l-4 border-green-500 p-4 rounded-r-lg;
+    }
+    
+    .chart-container {
+        @apply relative h-64 w-full;
+    }
+    
+    .loading-spinner {
+        @apply inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <!-- Header -->
+    <div class="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
+                        🛡️ ML Security Dashboard
+                    </h1>
+                    <p class="text-gray-600 dark:text-gray-400">
+                        Real-time threat intelligence and analytics
+                    </p>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <button id="refreshBtn" class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
+                        <svg class="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                        </svg>
+                        Refresh
+                    </button>
+                    <button id="darkModeToggle" class="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path class="dark:hidden" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
+                            <path class="hidden dark:block" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Key Metrics -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div class="metric-card">
+                <div class="flex items-center">
+                    <div class="flex-1">
+                        <h3 class="text-lg font-semibold">Total Predictions</h3>
+                        <p class="text-3xl font-bold" id="totalPredictions">0</p>
+                        <p class="text-blue-100 text-sm">Last 30 days</p>
+                    </div>
+                    <div class="text-4xl">📊</div>
+                </div>
+            </div>
+            
+            <div class="metric-card">
+                <div class="flex items-center">
+                    <div class="flex-1">
+                        <h3 class="text-lg font-semibold">Threats Detected</h3>
+                        <p class="text-3xl font-bold" id="threatsDetected">0</p>
+                        <p class="text-blue-100 text-sm">High confidence</p>
+                    </div>
+                    <div class="text-4xl">⚠️</div>
+                </div>
+            </div>
+            
+            <div class="metric-card">
+                <div class="flex items-center">
+                    <div class="flex-1">
+                        <h3 class="text-lg font-semibold">Avg Confidence</h3>
+                        <p class="text-3xl font-bold" id="avgConfidence">0%</p>
+                        <p class="text-blue-100 text-sm">Model accuracy</p>
+                    </div>
+                    <div class="text-4xl">🎯</div>
+                </div>
+            </div>
+            
+            <div class="metric-card">
+                <div class="flex items-center">
+                    <div class="flex-1">
+                        <h3 class="text-lg font-semibold">Active Threats</h3>
+                        <p class="text-3xl font-bold" id="activeThreats">0</p>
+                        <p class="text-blue-100 text-sm">Last 24 hours</p>
+                    </div>
+                    <div class="text-4xl">🚨</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Row -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+            <!-- Prediction Trends -->
+            <div class="dashboard-card">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Prediction Trends</h3>
+                <div class="chart-container">
+                    <canvas id="predictionTrendsChart"></canvas>
+                </div>
+            </div>
+            
+            <!-- Threat Distribution -->
+            <div class="dashboard-card">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Threat Distribution</h3>
+                <div class="chart-container">
+                    <canvas id="threatDistributionChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Advanced Analytics -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+            <!-- Confidence Distribution -->
+            <div class="dashboard-card">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Confidence Distribution</h3>
+                <div class="chart-container">
+                    <canvas id="confidenceDistributionChart"></canvas>
+                </div>
+            </div>
+            
+            <!-- Geographic Threats -->
+            <div class="dashboard-card">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Geographic Threats</h3>
+                <div class="chart-container">
+                    <canvas id="geographicThreatsChart"></canvas>
+                </div>
+            </div>
+            
+            <!-- Risk Level Breakdown -->
+            <div class="dashboard-card">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Risk Level Breakdown</h3>
+                <div class="chart-container">
+                    <canvas id="riskLevelChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Activity -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <!-- Recent Predictions -->
+            <div class="dashboard-card">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Recent Predictions</h3>
+                    <a href="{% url 'history' %}" class="text-blue-500 hover:text-blue-600 text-sm">View All</a>
+                </div>
+                <div id="recentPredictions" class="space-y-3">
+                    <div class="loading-spinner mx-auto"></div>
+                </div>
+            </div>
+            
+            <!-- Threat Patterns -->
+            <div class="dashboard-card">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Detected Patterns</h3>
+                <div id="threatPatterns" class="space-y-3">
+                    <div class="loading-spinner mx-auto"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.min.js"></script>
+<script>
+    // Dashboard functionality
+    class Dashboard {
+        constructor() {
+            this.charts = {};
+            this.init();
+        }
+        
+        async init() {
+            await this.loadMetrics();
+            this.initCharts();
+            this.loadRecentActivity();
+            this.setupEventListeners();
+            
+            // Auto-refresh every 30 seconds
+            setInterval(() => this.refresh(), 30000);
+        }
+        
+        async loadMetrics() {
+            try {
+                const response = await fetch('/api/dashboard/metrics/');
+                const data = await response.json();
+                
+                if (data.success) {
+                    document.getElementById('totalPredictions').textContent = data.metrics.total_predictions;
+                    document.getElementById('threatsDetected').textContent = data.metrics.threats_detected;
+                    document.getElementById('avgConfidence').textContent = data.metrics.avg_confidence + '%';
+                    document.getElementById('activeThreats').textContent = data.metrics.active_threats;
+                }
+            } catch (error) {
+                console.error('Error loading metrics:', error);
+            }
+        }
+        
+        initCharts() {
+            this.initPredictionTrendsChart();
+            this.initThreatDistributionChart();
+            this.initConfidenceDistributionChart();
+            this.initGeographicThreatsChart();
+            this.initRiskLevelChart();
+        }
+        
+        initPredictionTrendsChart() {
+            const ctx = document.getElementById('predictionTrendsChart').getContext('2d');
+            this.charts.predictionTrends = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+                    datasets: [{
+                        label: 'Total Predictions',
+                        data: [12, 19, 3, 5, 2, 3, 7],
+                        borderColor: 'rgb(59, 130, 246)',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        tension: 0.4
+                    }, {
+                        label: 'Threats Detected',
+                        data: [2, 5, 1, 3, 1, 1, 2],
+                        borderColor: 'rgb(239, 68, 68)',
+                        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: document.documentElement.classList.contains('dark') ? '#fff' : '#000'
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                color: document.documentElement.classList.contains('dark') ? '#fff' : '#000'
+                            }
+                        },
+                        x: {
+                            ticks: {
+                                color: document.documentElement.classList.contains('dark') ? '#fff' : '#000'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        initThreatDistributionChart() {
+            const ctx = document.getElementById('threatDistributionChart').getContext('2d');
+            this.charts.threatDistribution = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Email Phishing', 'SMS Spam', 'Malicious URLs', 'Safe'],
+                    datasets: [{
+                        data: [30, 25, 20, 25],
+                        backgroundColor: [
+                            '#ef4444',
+                            '#f59e0b',
+                            '#8b5cf6',
+                            '#10b981'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                color: document.documentElement.classList.contains('dark') ? '#fff' : '#000'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        initConfidenceDistributionChart() {
+            const ctx = document.getElementById('confidenceDistributionChart').getContext('2d');
+            this.charts.confidenceDistribution = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['0-20%', '21-40%', '41-60%', '61-80%', '81-100%'],
+                    datasets: [{
+                        label: 'Predictions',
+                        data: [5, 12, 25, 35, 23],
+                        backgroundColor: 'rgba(59, 130, 246, 0.8)'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                color: document.documentElement.classList.contains('dark') ? '#fff' : '#000'
+                            }
+                        },
+                        x: {
+                            ticks: {
+                                color: document.documentElement.classList.contains('dark') ? '#fff' : '#000'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        initGeographicThreatsChart() {
+            const ctx = document.getElementById('geographicThreatsChart').getContext('2d');
+            this.charts.geographicThreats = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['US', 'UK', 'Germany', 'France', 'Canada'],
+                    datasets: [{
+                        label: 'Threats',
+                        data: [45, 23, 18, 12, 8],
+                        backgroundColor: 'rgba(239, 68, 68, 0.8)'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                color: document.documentElement.classList.contains('dark') ? '#fff' : '#000'
+                            }
+                        },
+                        x: {
+                            ticks: {
+                                color: document.documentElement.classList.contains('dark') ? '#fff' : '#000'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        initRiskLevelChart() {
+            const ctx = document.getElementById('riskLevelChart').getContext('2d');
+            this.charts.riskLevel = new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: ['Low', 'Medium', 'High', 'Critical'],
+                    datasets: [{
+                        data: [40, 30, 20, 10],
+                        backgroundColor: [
+                            '#10b981',
+                            '#f59e0b',
+                            '#f97316',
+                            '#ef4444'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                color: document.documentElement.classList.contains('dark') ? '#fff' : '#000'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        async loadRecentActivity() {
+            try {
+                const response = await fetch('/api/dashboard/recent-activity/');
+                const data = await response.json();
+                
+                if (data.success) {
+                    this.renderRecentPredictions(data.recent_predictions);
+                    this.renderThreatPatterns(data.threat_patterns);
+                }
+            } catch (error) {
+                console.error('Error loading recent activity:', error);
+            }
+        }
+        
+        renderRecentPredictions(predictions) {
+            const container = document.getElementById('recentPredictions');
+            container.innerHTML = '';
+            
+            predictions.forEach(prediction => {
+                const card = document.createElement('div');
+                card.className = prediction.is_malicious ? 'threat-card' : 'safe-card';
+                card.innerHTML = `
+                    <div class="flex items-center justify-between">
+                        <div class="flex-1">
+                            <p class="text-sm font-medium ${prediction.is_malicious ? 'text-red-800 dark:text-red-200' : 'text-green-800 dark:text-green-200'}">
+                                ${prediction.predicted_label}
+                            </p>
+                            <p class="text-xs text-gray-600 dark:text-gray-400">
+                                ${prediction.input_text}
+                            </p>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-sm font-semibold">${prediction.confidence_percentage}</p>
+                            <p class="text-xs text-gray-500">${prediction.time_ago}</p>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+        
+        renderThreatPatterns(patterns) {
+            const container = document.getElementById('threatPatterns');
+            container.innerHTML = '';
+            
+            patterns.forEach(pattern => {
+                const card = document.createElement('div');
+                card.className = 'bg-gray-50 dark:bg-gray-700 rounded-lg p-3';
+                card.innerHTML = `
+                    <div class="flex items-center justify-between">
+                        <div class="flex-1">
+                            <p class="text-sm font-medium text-gray-900 dark:text-white">
+                                ${pattern.pattern_type}
+                            </p>
+                            <p class="text-xs text-gray-600 dark:text-gray-400">
+                                ${pattern.pattern_value}
+                            </p>
+                        </div>
+                        <div class="text-right">
+                            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
+                                ${pattern.occurrence_count} times
+                            </span>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+        
+        setupEventListeners() {
+            document.getElementById('refreshBtn').addEventListener('click', () => this.refresh());
+            document.getElementById('darkModeToggle').addEventListener('click', () => this.toggleDarkMode());
+        }
+        
+        async refresh() {
+            await this.loadMetrics();
+            await this.loadRecentActivity();
+        }
+        
+        toggleDarkMode() {
+            document.documentElement.classList.toggle('dark');
+            localStorage.setItem('darkMode', document.documentElement.classList.contains('dark'));
+            
+            // Update chart colors
+            Object.values(this.charts).forEach(chart => {
+                chart.update();
+            });
+        }
+    }
+    
+    // Initialize dashboard when page loads
+    document.addEventListener('DOMContentLoaded', () => {
+        new Dashboard();
+    });
+</script>
+{% endblock %} 

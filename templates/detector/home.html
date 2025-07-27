@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ML Security Detector</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            50: '#eff6ff',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .loading {
+            display: none;
+        }
+        .result-card {
+            transition: all 0.3s ease;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
+    <!-- Navigation -->
+    <nav class="bg-white dark:bg-gray-800 shadow-lg border-b border-gray-200 dark:border-gray-700">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
+                        🛡️ ML Security Detector
+                    </h1>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <a href="{% url 'dashboard' %}" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors text-sm font-medium">
+                        📊 Enhanced Dashboard
+                    </a>
+                    <button onclick="clearHistory('all')" class="p-2 rounded-lg bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/40 transition-colors" title="Clear all history">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                        </svg>
+                    </button>
+                    <button id="darkModeToggle" class="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path class="dark:hidden" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
+                            <path class="hidden dark:block" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Hero Section -->
+        <div class="text-center mb-12">
+            <h2 class="text-4xl font-bold text-gray-900 dark:text-white mb-4">
+                AI-Powered Security Detection
+            </h2>
+            <p class="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
+                Protect yourself from phishing emails, spam SMS, and malicious URLs using advanced machine learning algorithms.
+            </p>
+        </div>
+
+        <!-- Tab Navigation -->
+        <div class="flex flex-wrap justify-center mb-8">
+            <button class="tab-btn active px-6 py-3 mx-2 mb-2 text-lg font-medium rounded-lg bg-primary-500 text-white hover:bg-primary-600 transition-colors" data-tab="email">
+                📧 Email Classification
+            </button>
+            <button class="tab-btn px-6 py-3 mx-2 mb-2 text-lg font-medium rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors" data-tab="sms">
+                📱 SMS Spam Detection
+            </button>
+            <button class="tab-btn px-6 py-3 mx-2 mb-2 text-lg font-medium rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors" data-tab="url">
+                🔗 URL Malicious Check
+            </button>
+        </div>
+
+        <!-- Tab Content -->
+        <div class="max-w-4xl mx-auto">
+            <!-- Email Tab -->
+            <div id="email-tab" class="tab-content active">
+                <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8">
+                    <h3 class="text-2xl font-bold text-gray-900 dark:text-white mb-6">Email Phishing Detection</h3>
+                    <form id="emailForm" class="space-y-6">
+                        <div>
+                            <label for="emailText" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                Email Content
+                            </label>
+                            <textarea 
+                                id="emailText" 
+                                name="email_text" 
+                                rows="8" 
+                                class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
+                                placeholder="Paste the email content here to check for phishing attempts..."
+                                required
+                            ></textarea>
+                        </div>
+                        <button type="submit" class="w-full bg-primary-500 hover:bg-primary-600 text-white font-bold py-3 px-6 rounded-lg transition-colors">
+                            Analyze Email
+                        </button>
+                    </form>
+                    <div id="emailLoading" class="loading text-center py-8">
+                        <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
+                        <p class="mt-2 text-gray-600 dark:text-gray-400">Analyzing email...</p>
+                    </div>
+                    <div id="emailResult" class="mt-6"></div>
+                    
+                    <!-- Email Prediction History -->
+                    <div class="mt-8">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center space-x-3">
+                                <input type="checkbox" id="selectAllEmail" class="form-checkbox h-5 w-5 text-primary-500" onclick="toggleSelectAll('email')">
+                                <label for="selectAllEmail" class="text-sm font-medium text-gray-700 dark:text-gray-300">Select All</label>
+                                <button id="deleteSelectedEmailBtn" class="ml-4 hidden bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm" onclick="deleteSelected('email')">Delete Selected</button>
+                            </div>
+                            <button onclick="clearHistory('email')" class="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-colors" title="Clear email history">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                </svg>
+                            </button>
+                        </div>
+                        {% if email_history %}
+                            <div class="space-y-3" id="emailHistoryList">
+                                {% for prediction in email_history %}
+                                <div class="flex items-center bg-gray-50 dark:bg-gray-700 rounded-lg p-4 border-l-4 {% if prediction.is_malicious %}border-red-500{% else %}border-green-500{% endif %}">
+                                    <input type="checkbox" class="email-select form-checkbox h-5 w-5 text-primary-500 mr-4" value="{{ prediction.id }}" onchange="toggleDeleteBtn('email')">
+                                    <div class="flex-1">
+                                        <p class="text-sm text-gray-600 dark:text-gray-300 mb-1">{{ prediction.input_text }}</p>
+                                        <div class="flex items-center space-x-2">
+                                            <span class="text-xs font-medium {% if prediction.is_malicious %}text-red-600 dark:text-red-400{% else %}text-green-600 dark:text-green-400{% endif %}">
+                                                {{ prediction.predicted_label }}
+                                            </span>
+                                            <span class="text-xs text-gray-500">{{ prediction.timestamp|date:"M d, H:i" }}</span>
+                                        </div>
+                                    </div>
+                                    <div class="text-right">
+                                        <div class="text-sm font-semibold text-gray-900 dark:text-white">{{ prediction.confidence_percentage }}</div>
+                                        <div class="w-16 bg-gray-200 dark:bg-gray-600 rounded-full h-2 mt-1">
+                                            <div class="bg-blue-500 h-2 rounded-full" style="width: {{ prediction.confidence_score }}%"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <p class="text-gray-500 dark:text-gray-400 text-sm">No email predictions yet.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- SMS Tab -->
+            <div id="sms-tab" class="tab-content">
+                <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8">
+                    <h3 class="text-2xl font-bold text-gray-900 dark:text-white mb-6">SMS Spam Detection</h3>
+                    <form id="smsForm" class="space-y-6">
+                        <div>
+                            <label for="smsText" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                SMS Message
+                            </label>
+                            <textarea 
+                                id="smsText" 
+                                name="sms_text" 
+                                rows="6" 
+                                class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
+                                placeholder="Enter the SMS message to check for spam..."
+                                required
+                            ></textarea>
+                        </div>
+                        <button type="submit" class="w-full bg-primary-500 hover:bg-primary-600 text-white font-bold py-3 px-6 rounded-lg transition-colors">
+                            Analyze SMS
+                        </button>
+                    </form>
+                    <div id="smsLoading" class="loading text-center py-8">
+                        <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
+                        <p class="mt-2 text-gray-600 dark:text-gray-400">Analyzing SMS...</p>
+                    </div>
+                    <div id="smsResult" class="mt-6"></div>
+                    
+                    <!-- SMS Prediction History -->
+                    <div class="mt-8">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center space-x-3">
+                                <input type="checkbox" id="selectAllSms" class="form-checkbox h-5 w-5 text-primary-500" onclick="toggleSelectAll('sms')">
+                                <label for="selectAllSms" class="text-sm font-medium text-gray-700 dark:text-gray-300">Select All</label>
+                                <button id="deleteSelectedSmsBtn" class="ml-4 hidden bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm" onclick="deleteSelected('sms')">Delete Selected</button>
+                            </div>
+                            <button onclick="clearHistory('sms')" class="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-colors" title="Clear SMS history">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                </svg>
+                            </button>
+                        </div>
+                        {% if sms_history %}
+                            <div class="space-y-3" id="smsHistoryList">
+                                {% for prediction in sms_history %}
+                                <div class="flex items-center bg-gray-50 dark:bg-gray-700 rounded-lg p-4 border-l-4 {% if prediction.is_malicious %}border-red-500{% else %}border-green-500{% endif %}">
+                                    <input type="checkbox" class="sms-select form-checkbox h-5 w-5 text-primary-500 mr-4" value="{{ prediction.id }}" onchange="toggleDeleteBtn('sms')">
+                                    <div class="flex-1">
+                                        <p class="text-sm text-gray-600 dark:text-gray-300 mb-1">{{ prediction.input_text }}</p>
+                                        <div class="flex items-center space-x-2">
+                                            <span class="text-xs font-medium {% if prediction.is_malicious %}text-red-600 dark:text-red-400{% else %}text-green-600 dark:text-green-400{% endif %}">
+                                                {{ prediction.predicted_label }}
+                                            </span>
+                                            <span class="text-xs text-gray-500">{{ prediction.timestamp|date:"M d, H:i" }}</span>
+                                        </div>
+                                    </div>
+                                    <div class="text-right">
+                                        <div class="text-sm font-semibold text-gray-900 dark:text-white">{{ prediction.confidence_percentage }}</div>
+                                        <div class="w-16 bg-gray-200 dark:bg-gray-600 rounded-full h-2 mt-1">
+                                            <div class="bg-blue-500 h-2 rounded-full" style="width: {{ prediction.confidence_score }}%"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <p class="text-gray-500 dark:text-gray-400 text-sm">No SMS predictions yet.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- URL Tab -->
+            <div id="url-tab" class="tab-content">
+                <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8">
+                    <h3 class="text-2xl font-bold text-gray-900 dark:text-white mb-6">URL Malicious Check</h3>
+                    <form id="urlForm" class="space-y-6">
+                        <div>
+                            <label for="urlInput" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                URL to Check
+                            </label>
+                            <input 
+                                type="url" 
+                                id="urlInput" 
+                                name="url" 
+                                class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
+                                placeholder="https://example.com"
+                                required
+                            >
+                        </div>
+                        <button type="submit" class="w-full bg-primary-500 hover:bg-primary-600 text-white font-bold py-3 px-6 rounded-lg transition-colors">
+                            Check URL
+                        </button>
+                    </form>
+                    <div id="urlLoading" class="loading text-center py-8">
+                        <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
+                        <p class="mt-2 text-gray-600 dark:text-gray-400">Checking URL...</p>
+                    </div>
+                    <div id="urlResult" class="mt-6"></div>
+                    
+                    <!-- URL Prediction History -->
+                    <div class="mt-8">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center space-x-3">
+                                <input type="checkbox" id="selectAllUrl" class="form-checkbox h-5 w-5 text-primary-500" onclick="toggleSelectAll('url')">
+                                <label for="selectAllUrl" class="text-sm font-medium text-gray-700 dark:text-gray-300">Select All</label>
+                                <button id="deleteSelectedUrlBtn" class="ml-4 hidden bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm" onclick="deleteSelected('url')">Delete Selected</button>
+                            </div>
+                            <button onclick="clearHistory('url')" class="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-colors" title="Clear URL history">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                </svg>
+                            </button>
+                        </div>
+                        {% if url_history %}
+                            <div class="space-y-3" id="urlHistoryList">
+                                {% for prediction in url_history %}
+                                <div class="flex items-center bg-gray-50 dark:bg-gray-700 rounded-lg p-4 border-l-4 {% if prediction.is_malicious %}border-red-500{% else %}border-green-500{% endif %}">
+                                    <input type="checkbox" class="url-select form-checkbox h-5 w-5 text-primary-500 mr-4" value="{{ prediction.id }}" onchange="toggleDeleteBtn('url')">
+                                    <div class="flex-1">
+                                        <p class="text-sm text-gray-600 dark:text-gray-300 mb-1">{{ prediction.input_text }}</p>
+                                        <div class="flex items-center space-x-2">
+                                            <span class="text-xs font-medium {% if prediction.is_malicious %}text-red-600 dark:text-red-400{% else %}text-green-600 dark:text-green-400{% endif %}">
+                                                {{ prediction.predicted_label }}
+                                            </span>
+                                            <span class="text-xs text-gray-500">{{ prediction.timestamp|date:"M d, H:i" }}</span>
+                                        </div>
+                                    </div>
+                                    <div class="text-right">
+                                        <div class="text-sm font-semibold text-gray-900 dark:text-white">{{ prediction.confidence_percentage }}</div>
+                                        <div class="w-16 bg-gray-200 dark:bg-gray-600 rounded-full h-2 mt-1">
+                                            <div class="bg-blue-500 h-2 rounded-full" style="width: {{ prediction.confidence_score }}%"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <p class="text-gray-500 dark:text-gray-400 text-sm">No URL predictions yet.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Dark mode toggle
+        const darkModeToggle = document.getElementById('darkModeToggle');
+        const html = document.documentElement;
+        
+        // Check for saved dark mode preference
+        if (localStorage.getItem('darkMode') === 'true' || 
+            (!localStorage.getItem('darkMode') && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            html.classList.add('dark');
+        }
+        
+        darkModeToggle.addEventListener('click', () => {
+            html.classList.toggle('dark');
+            localStorage.setItem('darkMode', html.classList.contains('dark'));
+        });
+
+        // Tab functionality
+        const tabBtns = document.querySelectorAll('.tab-btn');
+        const tabContents = document.querySelectorAll('.tab-content');
+        
+        tabBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const targetTab = btn.getAttribute('data-tab');
+                
+                // Update button styles
+                tabBtns.forEach(b => {
+                    b.classList.remove('active', 'bg-primary-500', 'text-white');
+                    b.classList.add('bg-gray-200', 'dark:bg-gray-700', 'text-gray-700', 'dark:text-gray-300');
+                });
+                btn.classList.add('active', 'bg-primary-500', 'text-white');
+                btn.classList.remove('bg-gray-200', 'dark:bg-gray-700', 'text-gray-700', 'dark:text-gray-300');
+                
+                // Show target tab
+                tabContents.forEach(content => {
+                    content.classList.remove('active');
+                });
+                document.getElementById(`${targetTab}-tab`).classList.add('active');
+            });
+        });
+
+        // Form submissions
+        function showResult(resultDiv, loadingDiv, data) {
+            loadingDiv.style.display = 'none';
+            
+            if (data.success) {
+                const result = data.result;
+                let icon, color, bgColor;
+                
+                if (result.result === 'PHISHING' || result.result === 'SPAM' || result.result === 'MALICIOUS') {
+                    icon = '⚠️';
+                    color = 'text-red-600 dark:text-red-400';
+                    bgColor = 'bg-red-50 dark:bg-red-900/20';
+                } else {
+                    icon = '✅';
+                    color = 'text-green-600 dark:text-green-400';
+                    bgColor = 'bg-green-50 dark:bg-green-900/20';
+                }
+                
+                const confidenceScore = result.confidence_score || 85.0;
+                const confidencePercentage = confidenceScore.toFixed(1);
+                
+                resultDiv.innerHTML = `
+                    <div class="result-card ${bgColor} border border-gray-200 dark:border-gray-600 rounded-lg p-6">
+                        <div class="flex items-center justify-center mb-4">
+                            <span class="text-4xl mr-3">${icon}</span>
+                            <h4 class="text-2xl font-bold ${color}">${result.result}</h4>
+                        </div>
+                        <div class="text-center space-y-3">
+                            <div>
+                                <p class="text-gray-600 dark:text-gray-300 mb-2">
+                                    Confidence: <span class="font-semibold text-lg">${confidencePercentage}%</span>
+                                </p>
+                                <div class="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-3">
+                                    <div class="bg-blue-500 h-3 rounded-full transition-all duration-500" style="width: ${confidenceScore}%"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                // Refresh the page to show updated history
+                setTimeout(() => {
+                    location.reload();
+                }, 2000);
+            } else {
+                resultDiv.innerHTML = `
+                    <div class="result-card bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-6">
+                        <div class="flex items-center justify-center mb-4">
+                            <span class="text-4xl mr-3">❌</span>
+                            <h4 class="text-2xl font-bold text-red-600 dark:text-red-400">Error</h4>
+                        </div>
+                        <div class="text-center">
+                            <p class="text-gray-600 dark:text-gray-300">${data.error}</p>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        // Email form
+        document.getElementById('emailForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const form = e.target;
+            const resultDiv = document.getElementById('emailResult');
+            const loadingDiv = document.getElementById('emailLoading');
+            
+            loadingDiv.style.display = 'block';
+            resultDiv.innerHTML = '';
+            
+            try {
+                const response = await fetch('/predict/email/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        email_text: form.email_text.value
+                    })
+                });
+                
+                const data = await response.json();
+                showResult(resultDiv, loadingDiv, data);
+            } catch (error) {
+                showResult(resultDiv, loadingDiv, {
+                    success: false,
+                    error: 'Network error occurred'
+                });
+            }
+        });
+
+        // SMS form
+        document.getElementById('smsForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const form = e.target;
+            const resultDiv = document.getElementById('smsResult');
+            const loadingDiv = document.getElementById('smsLoading');
+            
+            loadingDiv.style.display = 'block';
+            resultDiv.innerHTML = '';
+            
+            try {
+                const response = await fetch('/predict/sms/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        sms_text: form.sms_text.value
+                    })
+                });
+                
+                const data = await response.json();
+                showResult(resultDiv, loadingDiv, data);
+            } catch (error) {
+                showResult(resultDiv, loadingDiv, {
+                    success: false,
+                    error: 'Network error occurred'
+                });
+            }
+        });
+
+        // URL form
+        document.getElementById('urlForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const form = e.target;
+            const resultDiv = document.getElementById('urlResult');
+            const loadingDiv = document.getElementById('urlLoading');
+            
+            loadingDiv.style.display = 'block';
+            resultDiv.innerHTML = '';
+            
+            try {
+                const response = await fetch('/predict/url/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        url: form.url.value
+                    })
+                });
+                
+                const data = await response.json();
+                showResult(resultDiv, loadingDiv, data);
+            } catch (error) {
+                showResult(resultDiv, loadingDiv, {
+                    success: false,
+                    error: 'Network error occurred'
+                });
+            }
+        });
+
+        // Clear history function
+        async function clearHistory(type) {
+            if (!confirm(`Are you sure you want to clear all ${type} prediction history?`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/clear-history/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        type: type
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Show success message
+                    const message = document.createElement('div');
+                    message.className = 'fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50';
+                    message.textContent = data.message;
+                    document.body.appendChild(message);
+                    
+                    // Remove message after 3 seconds
+                    setTimeout(() => {
+                        message.remove();
+                    }, 3000);
+                    
+                    // Refresh the page to show updated history
+                    setTimeout(() => {
+                        location.reload();
+                    }, 1000);
+                } else {
+                    // Show error message
+                    const message = document.createElement('div');
+                    message.className = 'fixed top-4 right-4 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg z-50';
+                    message.textContent = data.error || 'Error clearing history';
+                    document.body.appendChild(message);
+                    
+                    // Remove message after 3 seconds
+                    setTimeout(() => {
+                        message.remove();
+                    }, 3000);
+                }
+            } catch (error) {
+                // Show error message
+                const message = document.createElement('div');
+                message.className = 'fixed top-4 right-4 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg z-50';
+                message.textContent = 'Network error occurred';
+                document.body.appendChild(message);
+                
+                // Remove message after 3 seconds
+                setTimeout(() => {
+                    message.remove();
+                }, 3000);
+            }
+        }
+
+        // Bulk delete functionality
+        function toggleSelectAll(type) {
+            const list = document.getElementById(`${type}HistoryList`);
+            const checkboxes = list.querySelectorAll(`.${type}-select`);
+            const selectAllCheckbox = document.getElementById(`selectAll${type.charAt(0).toUpperCase() + type.slice(1)}`);
+            const deleteSelectedBtn = document.getElementById(`deleteSelected${type.charAt(0).toUpperCase() + type.slice(1)}Btn`);
+
+            if (selectAllCheckbox.checked) {
+                checkboxes.forEach(checkbox => {
+                    checkbox.checked = true;
+                });
+                deleteSelectedBtn.classList.remove('hidden');
+            } else {
+                checkboxes.forEach(checkbox => {
+                    checkbox.checked = false;
+                });
+                deleteSelectedBtn.classList.add('hidden');
+            }
+        }
+
+        function toggleDeleteBtn(type) {
+            const list = document.getElementById(`${type}HistoryList`);
+            const checkboxes = list.querySelectorAll(`.${type}-select`);
+            const selectAllCheckbox = document.getElementById(`selectAll${type.charAt(0).toUpperCase() + type.slice(1)}`);
+            const deleteSelectedBtn = document.getElementById(`deleteSelected${type.charAt(0).toUpperCase() + type.slice(1)}Btn`);
+
+            const checkedCount = list.querySelectorAll(`.${type}-select:checked`).length;
+            const totalCount = list.querySelectorAll(`.${type}-select`).length;
+
+            if (checkedCount === totalCount && totalCount > 0) {
+                selectAllCheckbox.checked = true;
+                deleteSelectedBtn.classList.remove('hidden');
+            } else {
+                selectAllCheckbox.checked = false;
+                deleteSelectedBtn.classList.add('hidden');
+            }
+        }
+
+        async function deleteSelected(type) {
+            const selectedIds = Array.from(document.querySelectorAll(`.${type}-select:checked`)).map(checkbox => checkbox.value);
+            if (selectedIds.length === 0) {
+                alert('Please select at least one item to delete.');
+                return;
+            }
+
+            if (!confirm(`Are you sure you want to delete ${selectedIds.length} selected ${type} prediction(s)?`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/delete-selected-history/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        type: type,
+                        ids: selectedIds
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Show success message
+                    const message = document.createElement('div');
+                    message.className = 'fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50';
+                    message.textContent = data.message;
+                    document.body.appendChild(message);
+                    
+                    // Remove message after 3 seconds
+                    setTimeout(() => {
+                        message.remove();
+                    }, 3000);
+                    
+                    // Refresh the page to show updated history
+                    setTimeout(() => {
+                        location.reload();
+                    }, 1000);
+                } else {
+                    // Show error message
+                    const message = document.createElement('div');
+                    message.className = 'fixed top-4 right-4 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg z-50';
+                    message.textContent = data.error || 'Error deleting selected history';
+                    document.body.appendChild(message);
+                    
+                    // Remove message after 3 seconds
+                    setTimeout(() => {
+                        message.remove();
+                    }, 3000);
+                }
+            } catch (error) {
+                // Show error message
+                const message = document.createElement('div');
+                message.className = 'fixed top-4 right-4 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg z-50';
+                message.textContent = 'Network error occurred';
+                document.body.appendChild(message);
+                
+                // Remove message after 3 seconds
+                setTimeout(() => {
+                    message.remove();
+                }, 3000);
+            }
+        }
+    </script>
+</body>
+</html> 
